@@ -9,16 +9,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# DUmmy values
-temp = Keypair.random()
-
 # Stellar configuration
 STELLAR_CONFIG = {
     "network": Network.TESTNET_NETWORK_PASSPHRASE,
     "horizon_url": "https://horizon-testnet.stellar.org",
-    "issuer_secret": temp.secret,
-    "asset_code": "StellarToken",
-    "distribution_account_secret": temp.secret
+    "asset_code": "StellarToken"
 }
 
 server = Server(horizon_url=STELLAR_CONFIG["horizon_url"])
@@ -65,8 +60,6 @@ def setup_stellar_accounts():
         return None, None
     
     logger.info("Stellar setup complete!")
-    STELLAR_CONFIG["issuer_secret"] = issuer.secret
-    STELLAR_CONFIG["distribution_account_secret"] = distributor.secret
     return issuer, distributor
 
 def save_account_keys(issuer, distributor):
@@ -99,43 +92,45 @@ def initialize_game_stellar_setup():
     
     if keys:
         logger.info("Using existing Stellar accounts.")
-        STELLAR_CONFIG["issuer_secret"] = keys["issuer_secret_key"]
-        STELLAR_CONFIG["distribution_account_secret"] = keys["distributor_secret_key"]
+        issuer = Keypair.from_secret(keys["issuer_secret_key"])
+        distributor = Keypair.from_secret(keys["distributor_secret_key"])
     else:
         logger.info("Setting up new Stellar accounts...")
         issuer, distributor = setup_stellar_accounts()
         if issuer and distributor:
             save_account_keys(issuer, distributor)
-            STELLAR_CONFIG["issuer_secret"] = issuer.secret
-            STELLAR_CONFIG["distribution_account_secret"] = distributor.secret
         else:
             logger.error("Failed to set up Stellar accounts. Please try again.")
             return
 
+    STELLAR_CONFIG["issuer_secret"] = issuer.secret
+    STELLAR_CONFIG["distribution_account_secret"] = distributor.secret
     logger.info("Stellar setup initialized successfully!")
-    
+
 def create_guild_account(guild_name):
     """Create a new Stellar account for a guild and fund it using Friendbot."""
-    account = Keypair.random()
-    public_key = account.public_key
-    
-    logger.info(f"Creating and funding account for guild {guild_name}: {public_key}")
-    friendbot_url = f"https://friendbot.stellar.org?addr={public_key}"
-    response = requests.get(friendbot_url)
-    
-    if response.status_code == 200:
-        logger.info(f"Account for guild {guild_name} created and funded successfully.")
-        guild_data = {
-            "name": guild_name,
-            "public_key": public_key,
-            "secret_key": account.secret
-        }
-        with open(f"{guild_name}_stellar_data.json", 'w') as f:
-            json.dump(guild_data, f)
-        return account
-    else:
+    account = create_and_fund_account()
+    if not account:
         logger.error(f"Failed to create and fund account for guild {guild_name}.")
         return None
+    
+    logger.info(f"Account for guild {guild_name} created and funded successfully.")
+    
+    # Create trustline
+    issuer = Keypair.from_secret(STELLAR_CONFIG["issuer_secret"])
+    asset = Asset(STELLAR_CONFIG["asset_code"], issuer.public_key)
+    if not create_trustline(account, asset):
+        logger.error(f"Failed to create trustline for guild {guild_name}")
+        return None
+    
+    guild_data = {
+        "name": guild_name,
+        "public_key": account.public_key,
+        "secret_key": account.secret
+    }
+    with open(f"{guild_name}_stellar_data.json", 'w') as f:
+        json.dump(guild_data, f)
+    return account
 
 def load_or_create_guild_account(guild_name):
     """Load existing guild account or create a new one if it doesn't exist."""
@@ -147,10 +142,35 @@ def load_or_create_guild_account(guild_name):
     else:
         return create_guild_account(guild_name)
 
+def check_and_create_trustline(account, asset):
+    """Check if the account has a trustline for the asset, and create one if it doesn't."""
+    server = Server(horizon_url=STELLAR_CONFIG["horizon_url"])
+    try:
+        account_info = server.accounts().account_id(account.public_key).call()
+        for balance in account_info['balances']:
+            if balance['asset_type'] != 'native' and balance['asset_code'] == asset.code and balance['asset_issuer'] == asset.issuer:
+                logger.info(f"Trustline already exists for account {account.public_key}")
+                return True
+        
+        # If we get here, the trustline doesn't exist, so we create it
+        return create_trustline(account, asset)
+    except Exception as e:
+        logger.error(f"Error checking or creating trustline: {str(e)}")
+        return False
+
 def setup_smart_contract(player_account, guild_account, daily_amount):
     """Set up a smart contract for daily token transfers from player to guild."""
     issuer = Keypair.from_secret(STELLAR_CONFIG["issuer_secret"])
     asset = Asset(STELLAR_CONFIG["asset_code"], issuer.public_key)
+
+    # Check and create trustlines if needed
+    if not check_and_create_trustline(player_account, asset):
+        logger.error(f"Failed to set up trustline for player account {player_account.public_key}")
+        return None
+    
+    if not check_and_create_trustline(guild_account, asset):
+        logger.error(f"Failed to set up trustline for guild account {guild_account.public_key}")
+        return None
 
     server = Server(horizon_url=STELLAR_CONFIG["horizon_url"])
     player_stellar_account = server.load_account(player_account.public_key)
@@ -180,7 +200,7 @@ def setup_smart_contract(player_account, guild_account, daily_amount):
     except (NotFoundError, BadResponseError, BadRequestError) as e:
         logger.error(f"Error setting up smart contract: {str(e)}")
         return None
-
+    
 def execute_daily_transfer(player_account, guild_account, daily_amount):
     """Execute the daily token transfer from player to guild."""
     issuer = Keypair.from_secret(STELLAR_CONFIG["issuer_secret"])
@@ -215,18 +235,11 @@ def execute_daily_transfer(player_account, guild_account, daily_amount):
         logger.error(f"Error executing daily transfer: {str(e)}")
         return None
 
-def get_account(account_id):
-    try:
-        return server.load_account(account_id)
-    except NotFoundError:
-        logger.error(f"Account {account_id} not found.")
-        return None
-
 def create_trustline(account, asset):
     try:
         transaction = (
             TransactionBuilder(
-                source_account=get_account(account.public_key),
+                source_account=server.load_account(account.public_key),
                 network_passphrase=STELLAR_CONFIG["network"],
                 base_fee=server.fetch_base_fee(),
             )
@@ -243,13 +256,12 @@ def create_trustline(account, asset):
         return None
 
 def issue_asset(amount, destination, issuer):
-    distribution_account = Keypair.from_secret(STELLAR_CONFIG["distribution_account_secret"])
     asset = Asset(STELLAR_CONFIG["asset_code"], issuer.public_key)
 
     try:
         transaction = (
             TransactionBuilder(
-                source_account=get_account(issuer.public_key),
+                source_account=server.load_account(issuer.public_key),
                 network_passphrase=STELLAR_CONFIG["network"],
                 base_fee=server.fetch_base_fee(),
             )

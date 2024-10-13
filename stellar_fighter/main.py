@@ -197,7 +197,7 @@ while run:
         # draw menu options
         draw_text(f"Coins: {coins}", menu_font, WHITE, 20, 20)
         play_button = draw_button("Play", menu_font, BLACK, 400, 200, 200, 50)
-        leaderboard_button = draw_button("Leaderboard", menu_font, BLACK, 400, 300, 200, 50)
+        leaderboard_button = draw_button("Leaderboard", menu_font, BLACK, 350, 300, 300, 50)
         guilds_button = draw_button("Guilds", menu_font, BLACK, 400, 400, 200, 50)
         quit_button = draw_button("Quit", menu_font, BLACK, 400, 500, 200, 50)
 
@@ -315,7 +315,7 @@ while run:
         save_data()
 
         # draw back to menu button
-        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 500, 200, 50)
+        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 500, 300, 50)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -329,7 +329,7 @@ while run:
         for i, (name, score) in enumerate(leaderboard):
             draw_text(f"{i+1}. {name}: {score}", score_font, WHITE, 400, 150 + i * 40)
 
-        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 500, 200, 50)
+        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 500, 300, 50)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -345,7 +345,7 @@ while run:
         draw_text(f"You need at least 15 coins to play.", menu_font, WHITE, 400, 250)
         draw_text(f"Current coins: {coins}", menu_font, WHITE, 400, 300)
 
-        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 400, 200, 50)
+        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 400, 300, 50)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -359,7 +359,7 @@ while run:
         
         guild1_button = draw_button(guilds[0].name, menu_font, BLACK, 200, 200, 250, 50)
         guild2_button = draw_button(guilds[1].name, menu_font, BLACK, 550, 200, 250, 50)
-        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 500, 200, 50)
+        back_button = draw_button("Back to Menu", menu_font, BLACK, 400, 500, 300, 50)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -386,7 +386,7 @@ while run:
         draw_text("I agree to the terms", menu_font, WHITE, 380, 300)
         
         agree_button = draw_button("Join Guild", menu_font, BLACK, 400, 350, 200, 50)
-        back_button = draw_button("Back", menu_font, BLACK, 400, 420, 200, 50)
+        back_button = draw_button("Back", menu_font, BLACK, 400, 420, 300, 50)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -418,7 +418,7 @@ while run:
             player_guild.render(screen, menu_font)
             
             exit_guild_button = draw_button("Exit Guild", menu_font, BLACK, 300, 500, 200, 50)
-            back_button = draw_button("Back to Menu", menu_font, BLACK, 550, 500, 200, 50)
+            back_button = draw_button("Back to Menu", menu_font, BLACK, 550, 500, 300, 50)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:

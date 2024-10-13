@@ -39,7 +39,7 @@ class Guild:
 
     def render(self, screen, font):
         # Render guild information
-        screen.blit(self.icon, (screen.get_width() // 2 - self.icon.get_width() // 2, 50))
+        screen.blit(self.icon, (0, 0))
         draw_text(self.name, font, (255, 255, 255), screen.get_width() // 2, 150, center=True)
         draw_text(f"Members: {len(self.members)}", font, (255, 255, 255), screen.get_width() // 2, 200, center=True)
         draw_text(f"Total Collected: {self.total_collected}", font, (255, 255, 255), screen.get_width() // 2, 250, center=True)
@@ -47,7 +47,7 @@ class Guild:
 def load_guilds():
     guilds = [
         Guild("RED CROSS", "assets/images/guilds/red_cross.jpg"),
-        Guild("BRITISH HEART FOUNDATION", "assets/images/guilds/bhf.jpg")
+        Guild("BHF", "assets/images/guilds/bhf.jpg")
     ]
     return guilds
 
